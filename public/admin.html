@@ -46,6 +46,7 @@
             cursor: pointer;
             border-bottom: 3px solid transparent;
             transition: all 0.3s;
+            white-space: nowrap;
         }
 
         .nav-tabs li:hover {
@@ -255,6 +256,29 @@
             color: #666;
             font-size: 14px;
         }
+
+        .alert {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
     </style>
 </head>
 <body>
@@ -270,10 +294,13 @@
             <li data-tab="roles">Gerenciar Roles</li>
             <li data-tab="blocked">Sites Bloqueados</li>
             <li data-tab="users">Usuários</li>
+            <li data-tab="logs">Logs</li>
         </ul>
     </nav>
 
     <div class="container">
+        <div id="globalAlert" class="alert"></div>
+
         <!-- Dashboard -->
         <div id="dashboard" class="tab-content">
             <div class="stats">
@@ -286,9 +313,24 @@
                     <p>Total de Usuários</p>
                 </div>
                 <div class="stat-card">
-                    <h3 id="blockedSites">0</h3>
-                    <p>Sites Bloqueados</p>
+                    <h3 id="loginsToday">0</h3>
+                    <p>Logins Hoje</p>
                 </div>
+            </div>
+
+            <div class="card">
+                <h2>Estatísticas por Role</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Quantidade de Usuários</th>
+                        </tr>
+                    </thead>
+                    <tbody id="roleStatsTable">
+                        <tr><td colspan="2" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -304,10 +346,11 @@
                             <th>IP</th>
                             <th>Login</th>
                             <th>Expira</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="sessionsTable">
-                        <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                        <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -371,7 +414,40 @@
                     <h2 style="margin: 0;">Gerenciar Usuários</h2>
                     <button class="btn btn-primary" id="addUserBtn">+ Novo Usuário</button>
                 </div>
-                <p style="color: #666; margin-bottom: 20px;">Em desenvolvimento - funcionalidade será adicionada em breve</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuário</th>
+                            <th>Role</th>
+                            <th>Criado em</th>
+                            <th>Sessões Ativas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTable">
+                        <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div id="logs" class="tab-content hidden">
+            <div class="card">
+                <h2>Logs de Auditoria</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Usuário</th>
+                            <th>Ação</th>
+                            <th>Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTable">
+                        <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -392,6 +468,7 @@
                 <div class="form-group">
                     <label>Duração do Acesso (segundos)</label>
                     <input type="number" id="editRoleDuration" required>
+                    <small style="color: #999;">3600 segundos = 1 hora</small>
                 </div>
                 <div class="form-group">
                     <label>
@@ -455,11 +532,40 @@
         </div>
     </div>
 
+    <!-- Modal: Editar Usuário -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Usuário</h3>
+                <span class="close" onclick="closeModal('editUserModal')">&times;</span>
+            </div>
+            <form id="editUserForm">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label>Nome de Usuário</label>
+                    <input type="text" id="editUsername" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Nova Senha (deixe em branco para não alterar)</label>
+                    <input type="password" id="editPassword">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="editUserRole" required>
+                        <option value="">Selecione uma role</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">Salvar</button>
+            </form>
+        </div>
+    </div>
+
     <script>
         const API_URL = '/api';
         let token = localStorage.getItem('captive_token');
         let currentTab = 'dashboard';
         let roles = [];
+        let users = [];
 
         if (!token) {
             window.location.href = '/';
@@ -498,40 +604,57 @@
                 case 'blocked':
                     loadBlockedSites();
                     break;
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'logs':
+                    loadLogs();
+                    break;
             }
         }
 
         // Dashboard
         async function loadDashboard() {
             try {
-                const [sessionsRes, rolesRes] = await Promise.all([
-                    fetch(`${API_URL}/sessions`, { headers: { 'Authorization': `Bearer ${token}` }}),
-                    fetch(`${API_URL}/roles`, { headers: { 'Authorization': `Bearer ${token}` }})
-                ]);
+                const response = await fetch(`${API_URL}/admin/stats`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
 
-                const sessions = await sessionsRes.json();
-                const rolesData = await rolesRes.json();
+                if (!response.ok) throw new Error('Erro ao carregar estatísticas');
 
-                document.getElementById('activeSessions').textContent = sessions.length;
-                document.getElementById('totalUsers').textContent = '---';
-                document.getElementById('blockedSites').textContent = '---';
+                const stats = await response.json();
+
+                document.getElementById('activeSessions').textContent = stats.activeSessions;
+                document.getElementById('totalUsers').textContent = stats.totalUsers;
+                document.getElementById('loginsToday').textContent = stats.loginsToday;
+
+                const tbody = document.getElementById('roleStatsTable');
+                tbody.innerHTML = stats.roleStats.map(r => `
+                    <tr>
+                        <td><span class="badge badge-${r.name}">${r.name}</span></td>
+                        <td>${r.count}</td>
+                    </tr>
+                `).join('');
             } catch (error) {
                 console.error('Erro ao carregar dashboard:', error);
+                showAlert('Erro ao carregar dashboard', 'error');
             }
         }
 
         // Sessões
         async function loadSessions() {
             try {
-                const response = await fetch(`${API_URL}/sessions`, {
+                const response = await fetch(`${API_URL}/admin/sessions`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                if (!response.ok) throw new Error('Erro ao carregar sessões');
 
                 const sessions = await response.json();
                 const tbody = document.getElementById('sessionsTable');
 
                 if (sessions.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhuma sessão ativa</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Nenhuma sessão ativa</td></tr>';
                     return;
                 }
 
@@ -542,10 +665,35 @@
                         <td>${s.ip_address}</td>
                         <td>${new Date(s.login_time).toLocaleString('pt-BR')}</td>
                         <td>${new Date(s.expiry_time).toLocaleString('pt-BR')}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="disconnectSession(${s.id})">Desconectar</button>
+                        </td>
                     </tr>
                 `).join('');
             } catch (error) {
                 console.error('Erro ao carregar sessões:', error);
+                showAlert('Erro ao carregar sessões', 'error');
+            }
+        }
+
+        async function disconnectSession(sessionId) {
+            if (!confirm('Deseja realmente desconectar esta sessão?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/admin/disconnect/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    showAlert('Sessão desconectada com sucesso!', 'success');
+                    loadSessions();
+                } else {
+                    showAlert('Erro ao desconectar sessão', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao desconectar sessão:', error);
+                showAlert('Erro de conexão', 'error');
             }
         }
 
@@ -555,6 +703,8 @@
                 const response = await fetch(`${API_URL}/roles`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                if (!response.ok) throw new Error('Erro ao carregar roles');
 
                 roles = await response.json();
                 const tbody = document.getElementById('rolesTable');
@@ -570,10 +720,10 @@
                     </tr>
                 `).join('');
 
-                // Atualizar selects
                 updateRoleSelects();
             } catch (error) {
                 console.error('Erro ao carregar roles:', error);
+                showAlert('Erro ao carregar roles', 'error');
             }
         }
 
@@ -581,7 +731,8 @@
             const selects = [
                 document.getElementById('roleFilter'),
                 document.getElementById('blockedRoleId'),
-                document.getElementById('newUserRole')
+                document.getElementById('newUserRole'),
+                document.getElementById('editUserRole')
             ];
 
             selects.forEach(select => {
@@ -618,7 +769,7 @@
             const unrestricted = document.getElementById('editRoleUnrestricted').checked;
 
             try {
-                const response = await fetch(`${API_URL}/roles/${id}`, {
+                const response = await fetch(`${API_URL}/admin/roles/${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -631,24 +782,26 @@
                 });
 
                 if (response.ok) {
-                    alert('Role atualizada com sucesso!');
+                    showAlert('Role atualizada com sucesso!', 'success');
                     closeModal('editRoleModal');
                     loadRoles();
                 } else {
-                    alert('Erro ao atualizar role');
+                    showAlert('Erro ao atualizar role', 'error');
                 }
             } catch (error) {
                 console.error('Erro ao salvar role:', error);
-                alert('Erro de conexão');
+                showAlert('Erro de conexão', 'error');
             }
         });
 
         // Sites Bloqueados
         async function loadBlockedSites(roleId = null) {
             try {
-                const response = await fetch(`${API_URL}/blocked-sites/${roleId || 0}`, {
+                const response = await fetch(`${API_URL}/admin/blocked-sites/${roleId || 0}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                if (!response.ok) throw new Error('Erro ao carregar sites bloqueados');
 
                 const sites = await response.json();
                 const tbody = document.getElementById('blockedTable');
@@ -663,7 +816,7 @@
                     return `
                         <tr>
                             <td>${s.domain}</td>
-                            <td><span class="badge badge-${role?.name}">${role?.name}</span></td>
+                            <td><span class="badge badge-${role?.name}">${role?.name || 'N/A'}</span></td>
                             <td>${new Date(s.created_at).toLocaleString('pt-BR')}</td>
                             <td>
                                 <button class="btn btn-danger" onclick="deleteBlockedSite(${s.id})">Remover</button>
@@ -673,6 +826,7 @@
                 }).join('');
             } catch (error) {
                 console.error('Erro ao carregar sites bloqueados:', error);
+                showAlert('Erro ao carregar sites bloqueados', 'error');
             }
         }
 
@@ -687,11 +841,11 @@
         document.getElementById('addBlockedForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const domain = document.getElementById('blockedDomain').value;
+            const domain = document.getElementById('blockedDomain').value.trim();
             const roleId = document.getElementById('blockedRoleId').value;
 
             try {
-                const response = await fetch(`${API_URL}/blocked-sites`, {
+                const response = await fetch(`${API_URL}/admin/blocked-sites`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -701,16 +855,16 @@
                 });
 
                 if (response.ok) {
-                    alert('Site bloqueado adicionado!');
+                    showAlert('Site bloqueado adicionado!', 'success');
                     closeModal('addBlockedModal');
                     document.getElementById('addBlockedForm').reset();
                     loadBlockedSites();
                 } else {
-                    alert('Erro ao adicionar site');
+                    showAlert('Erro ao adicionar site', 'error');
                 }
             } catch (error) {
                 console.error('Erro ao adicionar site:', error);
-                alert('Erro de conexão');
+                showAlert('Erro de conexão', 'error');
             }
         });
 
@@ -718,24 +872,58 @@
             if (!confirm('Deseja realmente remover este site bloqueado?')) return;
 
             try {
-                const response = await fetch(`${API_URL}/blocked-sites/${id}`, {
+                const response = await fetch(`${API_URL}/admin/blocked-sites/${id}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (response.ok) {
-                    alert('Site removido com sucesso!');
+                    showAlert('Site removido com sucesso!', 'success');
                     loadBlockedSites();
                 } else {
-                    alert('Erro ao remover site');
+                    showAlert('Erro ao remover site', 'error');
                 }
             } catch (error) {
                 console.error('Erro ao remover site:', error);
-                alert('Erro de conexão');
+                showAlert('Erro de conexão', 'error');
             }
         }
 
-        // Novo Usuário
+        // Usuários
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_URL}/admin/users`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Erro ao carregar usuários');
+
+                users = await response.json();
+                const tbody = document.getElementById('usersTable');
+
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum usuário cadastrado</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(u => `
+                    <tr>
+                        <td>${u.username}</td>
+                        <td><span class="badge badge-${u.role}">${u.role}</span></td>
+                        <td>${new Date(u.created_at).toLocaleString('pt-BR')}</td>
+                        <td>${u.active_sessions}</td>
+                        <td>
+                            <button class="btn btn-primary" onclick="editUser(${u.id})">Editar</button>
+                            <button class="btn btn-danger" onclick="deleteUser(${u.id}, '${u.username}')">Excluir</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+                showAlert('Erro ao carregar usuários', 'error');
+            }
+        }
+
         document.getElementById('addUserBtn').addEventListener('click', () => {
             openModal('addUserModal');
         });
@@ -743,12 +931,12 @@
         document.getElementById('addUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const username = document.getElementById('newUsername').value;
+            const username = document.getElementById('newUsername').value.trim();
             const password = document.getElementById('newPassword').value;
             const roleId = document.getElementById('newUserRole').value;
 
             try {
-                const response = await fetch(`${API_URL}/users`, {
+                const response = await fetch(`${API_URL}/admin/users`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -762,17 +950,127 @@
                 });
 
                 if (response.ok) {
-                    alert('Usuário criado com sucesso!');
+                    showAlert('Usuário criado com sucesso!', 'success');
                     closeModal('addUserModal');
                     document.getElementById('addUserForm').reset();
+                    loadUsers();
                 } else {
-                    alert('Erro ao criar usuário');
+                    showAlert('Erro ao criar usuário. Verifique se já existe.', 'error');
                 }
             } catch (error) {
                 console.error('Erro ao criar usuário:', error);
-                alert('Erro de conexão');
+                showAlert('Erro de conexão', 'error');
             }
         });
+
+        function editUser(id) {
+            const user = users.find(u => u.id === id);
+            if (!user) return;
+
+            const role = roles.find(r => r.name === user.role);
+
+            document.getElementById('editUserId').value = user.id;
+            document.getElementById('editUsername').value = user.username;
+            document.getElementById('editPassword').value = '';
+            document.getElementById('editUserRole').value = role ? role.id : '';
+
+            openModal('editUserModal');
+        }
+
+        document.getElementById('editUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('editUserId').value;
+            const password = document.getElementById('editPassword').value;
+            const roleId = document.getElementById('editUserRole').value;
+
+            try {
+                const body = { role_id: parseInt(roleId) };
+                if (password) body.password = password;
+
+                const response = await fetch(`${API_URL}/admin/users/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (response.ok) {
+                    showAlert('Usuário atualizado com sucesso!', 'success');
+                    closeModal('editUserModal');
+                    loadUsers();
+                } else {
+                    showAlert('Erro ao atualizar usuário', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar usuário:', error);
+                showAlert('Erro de conexão', 'error');
+            }
+        });
+
+        async function deleteUser(id, username) {
+            if (!confirm(`Deseja realmente excluir o usuário ${username}?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    showAlert('Usuário excluído com sucesso!', 'success');
+                    loadUsers();
+                } else {
+                    showAlert('Erro ao excluir usuário', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao excluir usuário:', error);
+                showAlert('Erro de conexão', 'error');
+            }
+        }
+
+        // Logs
+        async function loadLogs() {
+            try {
+                const response = await fetch(`${API_URL}/admin/logs?limit=100`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Erro ao carregar logs');
+
+                const logs = await response.json();
+                const tbody = document.getElementById('logsTable');
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum log encontrado</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(l => {
+                    let details = '';
+                    try {
+                        const parsed = JSON.parse(l.details);
+                        details = Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(', ');
+                    } catch {
+                        details = l.details;
+                    }
+
+                    return `
+                        <tr>
+                            <td>${new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                            <td>${l.username}</td>
+                            <td><strong>${l.action}</strong></td>
+                            <td>${details}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Erro ao carregar logs:', error);
+                showAlert('Erro ao carregar logs', 'error');
+            }
+        }
 
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -789,9 +1087,21 @@
             document.getElementById(id).classList.remove('show');
         }
 
+        // Alertas
+        function showAlert(message, type) {
+            const alert = document.getElementById('globalAlert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type} show`;
+            
+            setTimeout(() => {
+                alert.classList.remove('show');
+            }, 5000);
+        }
+
         // Inicializar
-        loadDashboard();
-        loadRoles();
+        loadRoles().then(() => {
+            loadDashboard();
+        });
     </script>
 </body>
 </html>
