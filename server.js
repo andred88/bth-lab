@@ -165,16 +165,33 @@ async function initDatabase() {
     )
   }
 
-  const adminHash = await bcrypt.hash("admin123", 10)
-  const adminRole = await pool.query(`SELECT id FROM roles WHERE name = 'admin'`)
+  // Criar usuários padrão com senhas conhecidas
+  const defaultUsers = [
+    { username: "admin", password: "admin123", role: "admin" },
+    { username: "professor", password: "professor123", role: "professor" },
+    { username: "aluno", password: "aluno123", role: "aluno" },
+  ]
 
-  await pool.query(
-    `INSERT INTO users (username, password_hash, role_id) 
-     VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING`,
-    ["admin", adminHash, adminRole.rows[0].id],
-  )
+  for (const user of defaultUsers) {
+    const passwordHash = await bcrypt.hash(user.password, 10)
+    const roleResult = await pool.query(`SELECT id FROM roles WHERE name = $1`, [user.role])
+    
+    if (roleResult.rows.length > 0) {
+      await pool.query(
+        `INSERT INTO users (username, password_hash, role_id) 
+         VALUES ($1, $2, $3) ON CONFLICT (username) DO UPDATE 
+         SET password_hash = $2, role_id = $3`,
+        [user.username, passwordHash, roleResult.rows[0].id],
+      )
+      console.log(`✅ Usuário ${user.username} criado/atualizado - Senha: ${user.password}`)
+    }
+  }
 
   console.log("✅ Banco de dados inicializado com sucesso")
+  console.log("\n📋 CREDENCIAIS PADRÃO:")
+  console.log("   Admin: admin / admin123")
+  console.log("   Professor: professor / professor123")
+  console.log("   Aluno: aluno / aluno123\n")
 }
 
 app.post("/api/auth/login", async (req, res) => {
@@ -305,6 +322,7 @@ app.get("/api/roles", authenticate, async (req, res) => {
   }
 })
 
+// ROTAS ADMIN - CORRIGIDAS
 app.get("/api/admin/sessions", authenticate, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
@@ -326,24 +344,14 @@ app.get("/api/admin/sessions", authenticate, requireAdmin, async (req, res) => {
 app.post("/api/admin/disconnect/:sessionId", authenticate, requireAdmin, async (req, res) => {
   const { sessionId } = req.params
   try {
-    const result = await pool.query(
-      `
-      SELECT ip_address FROM sessions WHERE id = $1
-    `,
-      [sessionId],
-    )
+    const result = await pool.query(`SELECT ip_address FROM sessions WHERE id = $1`, [sessionId])
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Sessão não encontrada" })
     }
 
     const { ip_address } = result.rows[0]
-    await pool.query(
-      `
-      UPDATE sessions SET active = false WHERE id = $1
-    `,
-      [sessionId],
-    )
+    await pool.query(`UPDATE sessions SET active = false WHERE id = $1`, [sessionId])
 
     await removeFromNftSet(ip_address, "authenticated_users")
     await removeFromNftSet(ip_address, "admin_users")
@@ -378,11 +386,9 @@ app.post("/api/admin/users", authenticate, requireAdmin, async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, 10)
     const result = await pool.query(
-      `
-      INSERT INTO users (username, password_hash, role_id)
+      `INSERT INTO users (username, password_hash, role_id)
       VALUES ($1, $2, $3)
-      RETURNING id, username, role_id
-    `,
+      RETURNING id, username, role_id`,
       [username, passwordHash, role_id],
     )
 
@@ -401,19 +407,9 @@ app.put("/api/admin/users/:userId", authenticate, requireAdmin, async (req, res)
   try {
     if (password) {
       const passwordHash = await bcrypt.hash(password, 10)
-      await pool.query(
-        `
-        UPDATE users SET password_hash = $1, role_id = $2 WHERE id = $3
-      `,
-        [passwordHash, role_id, userId],
-      )
+      await pool.query(`UPDATE users SET password_hash = $1, role_id = $2 WHERE id = $3`, [passwordHash, role_id, userId])
     } else {
-      await pool.query(
-        `
-        UPDATE users SET role_id = $1 WHERE id = $2
-      `,
-        [role_id, userId],
-      )
+      await pool.query(`UPDATE users SET role_id = $1 WHERE id = $2`, [role_id, userId])
     }
 
     await logAction(req.user.id, "UPDATE_USER", { userId, role_id })
@@ -442,9 +438,7 @@ app.put("/api/admin/roles/:roleId", authenticate, requireAdmin, async (req, res)
   const { access_duration, unrestricted_access } = req.body
   try {
     await pool.query(
-      `
-      UPDATE roles SET access_duration = $1, unrestricted_access = $2 WHERE id = $3
-    `,
+      `UPDATE roles SET access_duration = $1, unrestricted_access = $2 WHERE id = $3`,
       [access_duration, unrestricted_access, roleId],
     )
 
@@ -460,12 +454,17 @@ app.put("/api/admin/roles/:roleId", authenticate, requireAdmin, async (req, res)
 app.get("/api/admin/blocked-sites/:roleId", authenticate, requireAdmin, async (req, res) => {
   const { roleId } = req.params
   try {
-    const result = await pool.query(
-      `
-      SELECT * FROM blocked_sites WHERE role_id = $1 ORDER BY created_at DESC
-    `,
-      [roleId],
-    )
+    let query = `SELECT * FROM blocked_sites`
+    let params = []
+    
+    if (roleId && roleId !== '0') {
+      query += ` WHERE role_id = $1`
+      params = [roleId]
+    }
+    
+    query += ` ORDER BY created_at DESC`
+    
+    const result = await pool.query(query, params)
     res.json(result.rows)
   } catch (error) {
     console.error("❌ Erro ao listar sites bloqueados:", error)
@@ -477,11 +476,7 @@ app.post("/api/admin/blocked-sites", authenticate, requireAdmin, async (req, res
   const { domain, role_id } = req.body
   try {
     const result = await pool.query(
-      `
-      INSERT INTO blocked_sites (domain, role_id)
-      VALUES ($1, $2)
-      RETURNING *
-    `,
+      `INSERT INTO blocked_sites (domain, role_id) VALUES ($1, $2) RETURNING *`,
       [domain, role_id],
     )
 
@@ -510,13 +505,11 @@ app.get("/api/admin/logs", authenticate, requireAdmin, async (req, res) => {
   const { limit = 100 } = req.query
   try {
     const result = await pool.query(
-      `
-      SELECT l.id, l.action, l.details, l.created_at, u.username
+      `SELECT l.id, l.action, l.details, l.created_at, u.username
       FROM audit_logs l
       JOIN users u ON l.user_id = u.id
       ORDER BY l.created_at DESC
-      LIMIT $1
-    `,
+      LIMIT $1`,
       [limit],
     )
     res.json(result.rows)
@@ -532,9 +525,7 @@ app.get("/api/admin/stats", authenticate, requireAdmin, async (req, res) => {
       SELECT COUNT(*) as count FROM sessions WHERE active = true AND expiry_time > NOW()
     `)
 
-    const totalUsers = await pool.query(`
-      SELECT COUNT(*) as count FROM users
-    `)
+    const totalUsers = await pool.query(`SELECT COUNT(*) as count FROM users`)
 
     const roleStats = await pool.query(`
       SELECT r.name, COUNT(u.id) as count FROM roles r
