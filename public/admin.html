@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Bethânia</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .nav {
+            background: white;
+            padding: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav-tabs {
+            display: flex;
+            list-style: none;
+            overflow-x: auto;
+        }
+
+        .nav-tabs li {
+            padding: 15px 25px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav-tabs li:hover {
+            background: #f5f7fa;
+        }
+
+        .nav-tabs li.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+
+        th {
+            background: #f5f7fa;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #27ae60;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            color: #333;
+        }
+
+        .close {
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-admin {
+            background: #667eea;
+            color: white;
+        }
+
+        .badge-professor {
+            background: #3498db;
+            color: white;
+        }
+
+        .badge-aluno {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛠️ Painel Administrativo</h1>
+        <button class="btn btn-danger" id="logoutBtn">Sair</button>
+    </div>
+
+    <nav class="nav">
+        <ul class="nav-tabs">
+            <li class="active" data-tab="dashboard">Dashboard</li>
+            <li data-tab="sessions">Sessões Ativas</li>
+            <li data-tab="roles">Gerenciar Roles</li>
+            <li data-tab="blocked">Sites Bloqueados</li>
+            <li data-tab="users">Usuários</li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <!-- Dashboard -->
+        <div id="dashboard" class="tab-content">
+            <div class="stats">
+                <div class="stat-card">
+                    <h3 id="activeSessions">0</h3>
+                    <p>Sessões Ativas</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="totalUsers">0</h3>
+                    <p>Total de Usuários</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="blockedSites">0</h3>
+                    <p>Sites Bloqueados</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sessões Ativas -->
+        <div id="sessions" class="tab-content hidden">
+            <div class="card">
+                <h2>Sessões Ativas</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuário</th>
+                            <th>Role</th>
+                            <th>IP</th>
+                            <th>Login</th>
+                            <th>Expira</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionsTable">
+                        <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Roles -->
+        <div id="roles" class="tab-content hidden">
+            <div class="card">
+                <h2>Gerenciar Roles</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Duração (seg)</th>
+                            <th>Acesso Irrestrito</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rolesTable">
+                        <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sites Bloqueados -->
+        <div id="blocked" class="tab-content hidden">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">Sites Bloqueados</h2>
+                    <button class="btn btn-primary" id="addBlockedBtn">+ Adicionar Site</button>
+                </div>
+                
+                <div class="form-group">
+                    <label>Filtrar por Role:</label>
+                    <select id="roleFilter">
+                        <option value="">Todas as roles</option>
+                    </select>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Domínio</th>
+                            <th>Role</th>
+                            <th>Adicionado em</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="blockedTable">
+                        <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Usuários -->
+        <div id="users" class="tab-content hidden">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">Gerenciar Usuários</h2>
+                    <button class="btn btn-primary" id="addUserBtn">+ Novo Usuário</button>
+                </div>
+                <p style="color: #666; margin-bottom: 20px;">Em desenvolvimento - funcionalidade será adicionada em breve</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Role -->
+    <div id="editRoleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Role</h3>
+                <span class="close" onclick="closeModal('editRoleModal')">&times;</span>
+            </div>
+            <form id="editRoleForm">
+                <input type="hidden" id="editRoleId">
+                <div class="form-group">
+                    <label>Nome</label>
+                    <input type="text" id="editRoleName" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Duração do Acesso (segundos)</label>
+                    <input type="number" id="editRoleDuration" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="editRoleUnrestricted">
+                        Acesso Irrestrito (sem bloqueios)
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Adicionar Site Bloqueado -->
+    <div id="addBlockedModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Adicionar Site Bloqueado</h3>
+                <span class="close" onclick="closeModal('addBlockedModal')">&times;</span>
+            </div>
+            <form id="addBlockedForm">
+                <div class="form-group">
+                    <label>Domínio</label>
+                    <input type="text" id="blockedDomain" placeholder="exemplo.com" required>
+                    <small style="color: #999;">Digite apenas o domínio, sem http:// ou www</small>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="blockedRoleId" required>
+                        <option value="">Selecione uma role</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">Adicionar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Novo Usuário -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Novo Usuário</h3>
+                <span class="close" onclick="closeModal('addUserModal')">&times;</span>
+            </div>
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label>Nome de Usuário</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="newUserRole" required>
+                        <option value="">Selecione uma role</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success" style="width: 100%;">Criar Usuário</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let token = localStorage.getItem('captive_token');
+        let currentTab = 'dashboard';
+        let roles = [];
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        // Navegação
+        document.querySelectorAll('.nav-tabs li').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                switchTab(tabName);
+            });
+        });
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tabs li').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(tabName).classList.remove('hidden');
+            
+            currentTab = tabName;
+            loadTabData(tabName);
+        }
+
+        function loadTabData(tabName) {
+            switch(tabName) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'sessions':
+                    loadSessions();
+                    break;
+                case 'roles':
+                    loadRoles();
+                    break;
+                case 'blocked':
+                    loadBlockedSites();
+                    break;
+            }
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const [sessionsRes, rolesRes] = await Promise.all([
+                    fetch(`${API_URL}/sessions`, { headers: { 'Authorization': `Bearer ${token}` }}),
+                    fetch(`${API_URL}/roles`, { headers: { 'Authorization': `Bearer ${token}` }})
+                ]);
+
+                const sessions = await sessionsRes.json();
+                const rolesData = await rolesRes.json();
+
+                document.getElementById('activeSessions').textContent = sessions.length;
+                document.getElementById('totalUsers').textContent = '---';
+                document.getElementById('blockedSites').textContent = '---';
+            } catch (error) {
+                console.error('Erro ao carregar dashboard:', error);
+            }
+        }
+
+        // Sessões
+        async function loadSessions() {
+            try {
+                const response = await fetch(`${API_URL}/sessions`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const sessions = await response.json();
+                const tbody = document.getElementById('sessionsTable');
+
+                if (sessions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhuma sessão ativa</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = sessions.map(s => `
+                    <tr>
+                        <td>${s.username}</td>
+                        <td><span class="badge badge-${s.role}">${s.role}</span></td>
+                        <td>${s.ip_address}</td>
+                        <td>${new Date(s.login_time).toLocaleString('pt-BR')}</td>
+                        <td>${new Date(s.expiry_time).toLocaleString('pt-BR')}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar sessões:', error);
+            }
+        }
+
+        // Roles
+        async function loadRoles() {
+            try {
+                const response = await fetch(`${API_URL}/roles`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                roles = await response.json();
+                const tbody = document.getElementById('rolesTable');
+
+                tbody.innerHTML = roles.map(r => `
+                    <tr>
+                        <td><span class="badge badge-${r.name}">${r.name}</span></td>
+                        <td>${r.access_duration}s (${Math.floor(r.access_duration/60)}min)</td>
+                        <td>${r.unrestricted_access ? '✅ Sim' : '❌ Não'}</td>
+                        <td>
+                            <button class="btn btn-primary" onclick="editRole(${r.id})">Editar</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Atualizar selects
+                updateRoleSelects();
+            } catch (error) {
+                console.error('Erro ao carregar roles:', error);
+            }
+        }
+
+        function updateRoleSelects() {
+            const selects = [
+                document.getElementById('roleFilter'),
+                document.getElementById('blockedRoleId'),
+                document.getElementById('newUserRole')
+            ];
+
+            selects.forEach(select => {
+                const currentValue = select.value;
+                const skipFirst = select.id === 'roleFilter';
+                
+                select.innerHTML = skipFirst ? '<option value="">Todas as roles</option>' : '<option value="">Selecione uma role</option>';
+                
+                roles.forEach(r => {
+                    select.innerHTML += `<option value="${r.id}">${r.name}</option>`;
+                });
+
+                if (currentValue) select.value = currentValue;
+            });
+        }
+
+        function editRole(id) {
+            const role = roles.find(r => r.id === id);
+            if (!role) return;
+
+            document.getElementById('editRoleId').value = role.id;
+            document.getElementById('editRoleName').value = role.name;
+            document.getElementById('editRoleDuration').value = role.access_duration;
+            document.getElementById('editRoleUnrestricted').checked = role.unrestricted_access;
+
+            openModal('editRoleModal');
+        }
+
+        document.getElementById('editRoleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('editRoleId').value;
+            const duration = document.getElementById('editRoleDuration').value;
+            const unrestricted = document.getElementById('editRoleUnrestricted').checked;
+
+            try {
+                const response = await fetch(`${API_URL}/roles/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        access_duration: parseInt(duration),
+                        unrestricted_access: unrestricted
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Role atualizada com sucesso!');
+                    closeModal('editRoleModal');
+                    loadRoles();
+                } else {
+                    alert('Erro ao atualizar role');
+                }
+            } catch (error) {
+                console.error('Erro ao salvar role:', error);
+                alert('Erro de conexão');
+            }
+        });
+
+        // Sites Bloqueados
+        async function loadBlockedSites(roleId = null) {
+            try {
+                const response = await fetch(`${API_URL}/blocked-sites/${roleId || 0}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const sites = await response.json();
+                const tbody = document.getElementById('blockedTable');
+
+                if (sites.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum site bloqueado</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = sites.map(s => {
+                    const role = roles.find(r => r.id === s.role_id);
+                    return `
+                        <tr>
+                            <td>${s.domain}</td>
+                            <td><span class="badge badge-${role?.name}">${role?.name}</span></td>
+                            <td>${new Date(s.created_at).toLocaleString('pt-BR')}</td>
+                            <td>
+                                <button class="btn btn-danger" onclick="deleteBlockedSite(${s.id})">Remover</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Erro ao carregar sites bloqueados:', error);
+            }
+        }
+
+        document.getElementById('roleFilter').addEventListener('change', (e) => {
+            loadBlockedSites(e.target.value || null);
+        });
+
+        document.getElementById('addBlockedBtn').addEventListener('click', () => {
+            openModal('addBlockedModal');
+        });
+
+        document.getElementById('addBlockedForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const domain = document.getElementById('blockedDomain').value;
+            const roleId = document.getElementById('blockedRoleId').value;
+
+            try {
+                const response = await fetch(`${API_URL}/blocked-sites`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ domain, role_id: parseInt(roleId) })
+                });
+
+                if (response.ok) {
+                    alert('Site bloqueado adicionado!');
+                    closeModal('addBlockedModal');
+                    document.getElementById('addBlockedForm').reset();
+                    loadBlockedSites();
+                } else {
+                    alert('Erro ao adicionar site');
+                }
+            } catch (error) {
+                console.error('Erro ao adicionar site:', error);
+                alert('Erro de conexão');
+            }
+        });
+
+        async function deleteBlockedSite(id) {
+            if (!confirm('Deseja realmente remover este site bloqueado?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/blocked-sites/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    alert('Site removido com sucesso!');
+                    loadBlockedSites();
+                } else {
+                    alert('Erro ao remover site');
+                }
+            } catch (error) {
+                console.error('Erro ao remover site:', error);
+                alert('Erro de conexão');
+            }
+        }
+
+        // Novo Usuário
+        document.getElementById('addUserBtn').addEventListener('click', () => {
+            openModal('addUserModal');
+        });
+
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const roleId = document.getElementById('newUserRole').value;
+
+            try {
+                const response = await fetch(`${API_URL}/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        role_id: parseInt(roleId)
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Usuário criado com sucesso!');
+                    closeModal('addUserModal');
+                    document.getElementById('addUserForm').reset();
+                } else {
+                    alert('Erro ao criar usuário');
+                }
+            } catch (error) {
+                console.error('Erro ao criar usuário:', error);
+                alert('Erro de conexão');
+            }
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('captive_token');
+            window.location.href = '/';
+        });
+
+        // Modais
+        function openModal(id) {
+            document.getElementById(id).classList.add('show');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        // Inicializar
+        loadDashboard();
+        loadRoles();
+    </script>
+</body>
+</html>
